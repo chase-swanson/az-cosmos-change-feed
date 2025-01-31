@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CosmosDb.ChangeFeed", "CosmosDb.ChangeFeed\CosmosDb.ChangeFeed.csproj", "{2F6A7024-73FD-42EE-A1DB-EE1B34133991}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CosmosDb.ChangeFeed.WorkerService", "CosmosDb.ChangeFeed.WorkerService\CosmosDb.ChangeFeed.WorkerService.csproj", "{CDDA9873-9C17-40F6-8EF7-12C2F3ECE7CE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -8,9 +8,9 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2F6A7024-73FD-42EE-A1DB-EE1B34133991}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2F6A7024-73FD-42EE-A1DB-EE1B34133991}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2F6A7024-73FD-42EE-A1DB-EE1B34133991}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2F6A7024-73FD-42EE-A1DB-EE1B34133991}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDDA9873-9C17-40F6-8EF7-12C2F3ECE7CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDDA9873-9C17-40F6-8EF7-12C2F3ECE7CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDDA9873-9C17-40F6-8EF7-12C2F3ECE7CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDDA9873-9C17-40F6-8EF7-12C2F3ECE7CE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

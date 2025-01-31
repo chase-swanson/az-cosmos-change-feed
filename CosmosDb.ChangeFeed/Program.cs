@@ -1,2 +1,171 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.Cosmos.Fluent;
+using Microsoft.Extensions.Configuration;
+
+namespace CosmosDb.ChangeFeed
+{
+    public class ToDoItem
+    {
+        public string? id { get; set; }
+        public DateTime creationTime { get; set; }
+        public string? Status { get; set; }
+    }
+
+    static class Program
+    {
+        static async Task Main(string[] args)
+        {
+            IConfiguration configuration = BuildConfiguration();
+
+            CosmosClient cosmosClient = BuildCosmosClient(configuration);
+
+            await InitializeContainersAsync(cosmosClient, configuration);
+
+            ChangeFeedProcessor processor = await StartChangeFeedProcessorAsync(cosmosClient, configuration);
+
+            await GenerateItemsAsync(cosmosClient, processor, configuration);
+        }
+
+        // <Delegate>
+        /// <summary>
+        /// The delegate receives batches of changes as they are generated in the change feed and can process them.
+        /// </summary>
+        static async Task HandleChangesAsync(
+            ChangeFeedProcessorContext context,
+            IReadOnlyCollection<ToDoItem> changes,
+            CancellationToken cancellationToken)
+        {
+            Console.WriteLine($"Started handling changes for lease {context.LeaseToken}...");
+            Console.WriteLine($"Change Feed request consumed {context.Headers.RequestCharge} RU.");
+            // SessionToken if needed to enforce Session consistency on another client instance
+            Console.WriteLine($"SessionToken ${context.Headers.Session}");
+
+            // We may want to track any operation's Diagnostics that took longer than some threshold
+            if (context.Diagnostics.GetClientElapsedTime() > TimeSpan.FromSeconds(1))
+            {
+                Console.WriteLine($"Change Feed request took longer than expected. Diagnostics:" + context.Diagnostics.ToString());
+            }
+
+            foreach (ToDoItem item in changes)
+            {
+                Console.WriteLine($"Detected operation for item with id {item.id}, created at {item.creationTime}.");
+                // Simulate some asynchronous operation
+                await Task.Delay(10);
+            }
+
+            Console.WriteLine("Finished handling changes.");
+        }
+        // </Delegate>
+
+        /// <summary>
+        /// Create required containers for the sample.
+        /// Change Feed processing requires a source container to read the Change Feed from, and a container to store the state on, called leases.
+        /// </summary>
+        private static async Task InitializeContainersAsync(
+            CosmosClient cosmosClient,
+            IConfiguration configuration)
+        {
+            string databaseName = "ToDoList";
+            string sourceContainerName = "Items";
+            string leaseContainerName = "leases";
+
+            if (string.IsNullOrEmpty(databaseName)
+                || string.IsNullOrEmpty(sourceContainerName)
+                || string.IsNullOrEmpty(leaseContainerName))
+            {
+                throw new ArgumentNullException("'SourceDatabaseName', 'SourceContainerName', and 'LeasesContainerName' settings are required. Verify your configuration.");
+            }
+
+            Database database = await cosmosClient.CreateDatabaseIfNotExistsAsync(databaseName);
+
+            await database.CreateContainerIfNotExistsAsync(new ContainerProperties(sourceContainerName, "/id"));
+
+            await database.CreateContainerIfNotExistsAsync(new ContainerProperties(leaseContainerName, "/id"));
+        }
+
+        // <DefineProcessor>
+        /// <summary>
+        /// Start the Change Feed Processor to listen for changes and process them with the HandleChangesAsync implementation.
+        /// </summary>
+        private static async Task<ChangeFeedProcessor> StartChangeFeedProcessorAsync(
+            CosmosClient cosmosClient,
+            IConfiguration configuration)
+        {
+            string databaseName = "ToDoList";
+            string sourceContainerName = "Items";
+            string leaseContainerName = "leases";
+
+            Container leaseContainer = cosmosClient.GetContainer(databaseName, leaseContainerName);
+            ChangeFeedProcessor changeFeedProcessor = cosmosClient.GetContainer(databaseName, sourceContainerName)
+                .GetChangeFeedProcessorBuilder<ToDoItem>(processorName: "changeFeedSample", onChangesDelegate: HandleChangesAsync)
+                    .WithInstanceName("consoleHost")
+                    .WithLeaseContainer(leaseContainer)
+                    .Build();
+
+            Console.WriteLine("Starting Change Feed Processor...");
+            await changeFeedProcessor.StartAsync();
+            Console.WriteLine("Change Feed Processor started.");
+            return changeFeedProcessor;
+        }
+        // </DefineProcessor>
+
+        /// <summary>
+        /// Generate sample items based on user input.
+        /// </summary>
+        private static async Task GenerateItemsAsync(
+            CosmosClient cosmosClient,
+            ChangeFeedProcessor changeFeedProcessor,
+            IConfiguration configuration)
+        {
+            string databaseName = "ToDoList";
+            string sourceContainerName = "Items";
+            Container sourceContainer = cosmosClient.GetContainer(databaseName, sourceContainerName);
+            while (true)
+            {
+                Console.WriteLine("Enter a number of items to insert in the container or 'exit' to stop:");
+                string command = Console.ReadLine();
+                if ("exit".Equals(command, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    Console.WriteLine();
+                    break;
+                }
+
+                if (int.TryParse(command, out int itemsToInsert))
+                {
+                    Console.WriteLine($"Generating {itemsToInsert} items...");
+                    for (int i = 0; i < itemsToInsert; i++)
+                    {
+                        string id = Guid.NewGuid().ToString();
+                        await sourceContainer.CreateItemAsync<ToDoItem>(
+                            new ToDoItem()
+                            {
+                                id = id,
+                                creationTime = DateTime.UtcNow
+                            },
+                            new PartitionKey(id));
+                    }
+                }
+            }
+
+            Console.WriteLine("Stopping Change Feed Processor...");
+            await changeFeedProcessor.StopAsync();
+            Console.WriteLine("Stopped Change Feed Processor.");
+        }
+
+        private static IConfiguration BuildConfiguration()
+        {
+            return new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build();
+        }
+
+        private static CosmosClient BuildCosmosClient(IConfiguration configuration)
+        {
+            return new CosmosClientBuilder("")
+                .Build();
+        }
+    }
+
+
+}
